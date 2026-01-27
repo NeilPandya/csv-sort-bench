@@ -1,11 +1,11 @@
 // Copyright (c) 2026 Neil Pandya
 
 use crate::algorithms::get_comparator;
-use crate::models::{SortPriority, Student};
+use crate::models::Record;
 
-pub fn sort(students: &mut [Student], priority: SortPriority) -> f64 {
-    let comparator = get_comparator(priority);
+pub fn sort(records: &mut [Record], column_index: usize) -> f64 {
+    let comparator = get_comparator(column_index);
     let start = std::time::Instant::now();
-    students.sort_by(comparator);
+    records.sort_by(comparator);
     start.elapsed().as_secs_f64() * 1000.0
 }

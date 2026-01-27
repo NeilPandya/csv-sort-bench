@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Neil Pandya
 
 // Algorithm Module Gateway
-// This file will define how we compare students and export the individual algorithm modules.
 
 pub mod bubblesort;
 pub mod insertionsort;
@@ -9,16 +8,21 @@ pub mod mergesort;
 pub mod quicksort;
 pub mod standardsort;
 
-use crate::models::{SortPriority, Student};
+use crate::models::Record;
 use std::cmp::Ordering;
 
-pub fn get_comparator(priority: SortPriority) -> impl Fn(&Student, &Student) -> Ordering {
-    move |a, b| match priority {
-        SortPriority::FirstName => a.first_name.cmp(&b.first_name),
-        SortPriority::LastName => a.last_name.cmp(&b.last_name),
-        SortPriority::Age => a.age.cmp(&b.age),
-        SortPriority::ActScore => a.act_score.cmp(&b.act_score),
-        SortPriority::SatScore => a.sat_score.cmp(&b.sat_score),
+/// Returns a comparator for the given column index.
+/// Attempts to compare numerically if both values are valid floats.
+pub fn get_comparator(column_index: usize) -> impl Fn(&Record, &Record) -> Ordering {
+    move |a, b| {
+        let val_a = a.get(column_index).map(|s| s.as_str()).unwrap_or("");
+        let val_b = b.get(column_index).map(|s| s.as_str()).unwrap_or("");
+
+        if let (Ok(num_a), Ok(num_b)) = (val_a.parse::<f64>(), val_b.parse::<f64>()) {
+            num_a.partial_cmp(&num_b).unwrap_or(Ordering::Equal)
+        } else {
+            val_a.cmp(val_b)
+        }
     }
 }
 

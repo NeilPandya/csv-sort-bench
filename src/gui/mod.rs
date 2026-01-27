@@ -8,7 +8,7 @@ pub mod app;
 pub fn run_app() -> eframe::Result<()> {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
-        "Rust Sort Benchmark",
+        "CSV Sort Benchmark",
         options,
         Box::new(|_cc| Ok(Box::new(app::SortBenchApp::default()))),
     )

@@ -1,21 +1,9 @@
 // Copyright (c) 2026 Neil Pandya
 
-use serde::{Deserialize, Serialize};
+/// A generic record representing a row in a CSV.
+/// This alias allows the codebase to remain agnostic of the underlying
+/// storage container, making future optimizations (like using Box or SmallVec) easier.
+pub type Record = Vec<String>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Student {
-    pub first_name: String,
-    pub last_name: String,
-    pub age: u8,
-    pub act_score: u8,
-    pub sat_score: u16,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SortPriority {
-    FirstName,
-    LastName,
-    Age,
-    ActScore,
-    SatScore,
-}
+/// Represents the results of a benchmark run for a specific algorithm.
+pub use crate::algorithms::BenchResult;

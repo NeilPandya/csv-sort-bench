@@ -1,19 +1,19 @@
-// Copyright 2023 Neil Pandya
+// Copyright 2026 Neil Pandya
 
 use crate::algorithms::get_comparator;
-use crate::models::{SortPriority, Student};
+use crate::models::Record;
 use std::cmp::Ordering;
 
-pub fn sort(students: &mut [Student], priority: SortPriority) -> f64 {
-    let comparator = get_comparator(priority);
+pub fn sort(records: &mut [Record], column_index: usize) -> f64 {
+    let comparator = get_comparator(column_index);
     let start = std::time::Instant::now();
-    quick_sort(students, &comparator);
+    quick_sort(records, &comparator);
     start.elapsed().as_secs_f64() * 1000.0
 }
 
-fn quick_sort<F>(slice: &mut [Student], compare: &F)
+fn quick_sort<F>(slice: &mut [Record], compare: &F)
 where
-    F: Fn(&Student, &Student) -> Ordering,
+    F: Fn(&Record, &Record) -> Ordering,
 {
     if slice.len() <= 1 {
         return;
@@ -23,9 +23,9 @@ where
     quick_sort(&mut slice[pivot_index + 1..], compare);
 }
 
-fn partition<F>(slice: &mut [Student], compare: &F) -> usize
+fn partition<F>(slice: &mut [Record], compare: &F) -> usize
 where
-    F: Fn(&Student, &Student) -> Ordering,
+    F: Fn(&Record, &Record) -> Ordering,
 {
     let pivot_index = slice.len() / 2;
     slice.swap(pivot_index, slice.len() - 1);

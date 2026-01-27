@@ -1,17 +1,19 @@
+// Copyright (c) 2026 Neil Pandya
+
 use crate::algorithms::get_comparator;
-use crate::models::{SortPriority, Student};
+use crate::models::Record;
 use std::cmp::Ordering;
 
-pub fn sort(students: &mut [Student], priority: SortPriority) -> f64 {
-    let comparator = get_comparator(priority);
+pub fn sort(records: &mut [Record], column_index: usize) -> f64 {
+    let comparator = get_comparator(column_index);
     let start = std::time::Instant::now();
-    merge_sort(students, &comparator);
+    merge_sort(records, &comparator);
     start.elapsed().as_secs_f64() * 1000.0
 }
 
-fn merge_sort<F>(slice: &mut [Student], compare: &F)
+fn merge_sort<F>(slice: &mut [Record], compare: &F)
 where
-    F: Fn(&Student, &Student) -> Ordering,
+    F: Fn(&Record, &Record) -> Ordering,
 {
     let mid = slice.len() / 2;
     if mid == 0 {
