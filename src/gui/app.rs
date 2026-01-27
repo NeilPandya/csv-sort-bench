@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Neil Pandya
 
-use crate::algorithms::{self, BenchResult};
+use crate::algorithms;
 use crate::io;
-use crate::models::Record;
+use crate::models::{Record, BenchResult};
 use eframe::egui;
 use egui_plot::{Bar, BarChart, Plot};
 use std::path::PathBuf;
