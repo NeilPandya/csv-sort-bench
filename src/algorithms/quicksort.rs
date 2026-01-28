@@ -39,3 +39,46 @@ where
     slice.swap(i, slice.len() - 1);
     i
 }
+
+// ----------  TESTS  -------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*; // brings `sort`, `Record`, and any helper functions into scope
+
+    #[test]
+    fn sorts_records_by_numeric_column() {
+        // Build a small test set with known order
+        let mut data = vec![
+            vec!["Delta".into(), "40".into()],
+            vec!["Alpha".into(), "10".into()],
+            vec!["Charlie".into(), "30".into()],
+            vec!["Beta".into(), "20".into()],
+        ];
+
+        // Sort by the second column (index 1), which contains numeric strings
+        sort(&mut data, 1);
+
+        // Collect the sorted keys (second column values)
+        let sorted_values: Vec<&String> = data.iter().filter_map(|r| r.get(1)).collect();
+
+        // Assert that the values are in ascending numeric order
+        assert_eq!(sorted_values, vec!["10", "20", "30", "40"]);
+    }
+
+    #[test]
+    fn handles_single_record() {
+        let mut data = vec![vec!["Only".into(), "999".into()]];
+
+        sort(&mut data, 0);
+
+        assert_eq!(data[0][0], "Only");
+        assert_eq!(data[0][1], "999");
+    }
+
+    #[test]
+    fn leaves_empty_slice_unchanged() {
+        let mut empty: Vec<Vec<String>> = Vec::new();
+        let duration = sort(&mut empty, 0);
+        assert!((0.0..=1.0).contains(&duration));
+    }
+}
