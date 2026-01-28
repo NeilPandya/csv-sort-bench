@@ -2,7 +2,7 @@
 
 use crate::algorithms;
 use crate::io;
-use crate::models::{Record, BenchResult};
+use crate::models::{BenchResult, Record};
 use eframe::egui;
 use egui_plot::{Bar, BarChart, Plot};
 use std::path::PathBuf;
@@ -93,22 +93,18 @@ impl eframe::App for SortBenchApp {
 
 impl SortBenchApp {
     fn load_csv(&mut self, path: PathBuf) {
-        let delimiter = io::detect_delimiter(&path);
-        let mut rdr = csv::ReaderBuilder::new()
-            .delimiter(delimiter)
-            .from_path(&path)
-            .expect("Failed to open CSV file");
-
-        if let Ok(headers) = rdr.headers() {
-            self.headers = headers.iter().map(|s| s.to_string()).collect();
-            self.records = rdr
-                .records()
-                .filter_map(|r| r.ok())
-                .map(|r| r.iter().map(|s| s.to_string()).collect())
-                .collect();
-            self.results.clear();
-            self.selected_column_index = 0;
-            self.loaded_file_path = Some(path);
+        match io::load_csv(&path) {
+            Ok((headers, records)) => {
+                self.headers = headers;
+                self.records = records;
+                self.results.clear();
+                self.selected_column_index = 0;
+                self.loaded_file_path = Some(path);
+            }
+            Err(e) => {
+                eprintln!("Failed to load CSV: {}", e);
+                // Optionally, you could set an error state to display in the UI
+            }
         }
     }
 
