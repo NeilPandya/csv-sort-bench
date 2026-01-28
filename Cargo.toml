@@ -12,3 +12,6 @@ rand = "0.8"
 fake = { version = "2.9", features = ["derive"] }
 chrono = "0.4"
 rfd = "0.15"
+
+[dev-dependencies]
+tempfile = "3"

@@ -39,3 +39,57 @@ pub fn save_csv(path: &Path, headers: &[String], records: &[Record]) -> Result<(
     wtr.flush()?;
     Ok(())
 }
+
+// ----------  TESTS  -------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn detect_delimiter_identifies_comma() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("sample.csv");
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "header1,header2,header3").unwrap();
+        writeln!(file, "val1,val2,val3").unwrap();
+
+        let detected = detect_delimiter(&file_path);
+        assert_eq!(detected, b',');
+    }
+
+    #[test]
+    fn detect_delimiter_identifies_semicolon() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("sample_semicolon.csv");
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "header1;header2;header3").unwrap();
+        writeln!(file, "val1;val2;val3").unwrap();
+
+        let detected = detect_delimiter(&file_path);
+        assert_eq!(detected, b';');
+    }
+
+    #[test]
+    fn save_csv_writes_well_formed_file() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("output.csv");
+
+        let headers = vec!["col1".to_string(), "col2".to_string()];
+        let records = vec![
+            vec!["a".to_string(), "1".to_string()],
+            vec!["b".to_string(), "2".to_string()],
+        ];
+
+        let result = save_csv(&file_path, &headers, &records);
+        assert!(result.is_ok());
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines[0], "col1,col2");
+        assert_eq!(lines[1], "a,1");
+        assert_eq!(lines[2], "b,2");
+    }
+}
