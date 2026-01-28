@@ -5,6 +5,26 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+pub fn load_csv(
+    path: &std::path::Path,
+) -> Result<(Vec<String>, Vec<Record>), Box<dyn std::error::Error>> {
+    let delimiter = detect_delimiter(path);
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_path(path)?;
+
+    // Extract headers
+    let headers = rdr.headers()?.iter().map(|s| s.to_string()).collect();
+
+    // Extract records
+    let records = rdr
+        .records()
+        .map(|result| result.map(|record| record.iter().map(|s| s.to_string()).collect()))
+        .collect::<Result<Vec<Record>, _>>()?;
+
+    Ok((headers, records))
+}
+
 pub fn detect_delimiter(path: &Path) -> u8 {
     let candidates = [b',', b';', b'\t', b'|'];
     let mut best_delimiter = b',';
@@ -47,6 +67,82 @@ mod tests {
     use std::fs;
     use std::io::Write;
     use tempfile::TempDir;
+
+    #[test]
+    fn load_csv_reads_basic_comma_delimited() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("basic.csv");
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "name,age,salary").unwrap();
+        writeln!(file, "Alice,30,50000").unwrap();
+        writeln!(file, "Bob,25,45000").unwrap();
+
+        let (headers, records) = load_csv(&file_path).unwrap();
+
+        assert_eq!(headers, vec!["name", "age", "salary"]);
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0], vec!["Alice", "30", "50000"]);
+        assert_eq!(records[1], vec!["Bob", "25", "45000"]);
+    }
+
+    #[test]
+    fn load_csv_reads_semicolon_delimited() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("semicolon.csv");
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "name;age;salary").unwrap();
+        writeln!(file, "Alice;30;50000").unwrap();
+        writeln!(file, "Bob;25;45000").unwrap();
+
+        let (headers, records) = load_csv(&file_path).unwrap();
+
+        assert_eq!(headers, vec!["name", "age", "salary"]);
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0], vec!["Alice", "30", "50000"]);
+        assert_eq!(records[1], vec!["Bob", "25", "45000"]);
+    }
+
+    #[test]
+    fn load_csv_reads_tab_delimited() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("tab_delimited.tsv");
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "name\tage\tsalary").unwrap();
+        writeln!(file, "Alice\t30\t50000").unwrap();
+        writeln!(file, "Bob\t25\t45000").unwrap();
+
+        let (headers, records) = load_csv(&file_path).unwrap();
+
+        assert_eq!(headers, vec!["name", "age", "salary"]);
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0], vec!["Alice", "30", "50000"]);
+        assert_eq!(records[1], vec!["Bob", "25", "45000"]);
+    }
+
+    #[test]
+    fn load_csv_handles_empty_file() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("empty.csv");
+        fs::File::create(&file_path).unwrap(); // Create empty file
+
+        // An empty CSV file should not panic; it either succeeds with empty data
+        // or returns a meaningful error. Either way, it should handle gracefully.
+        let _result = load_csv(&file_path);
+        // Test passes if we reach here without panicking
+    }
+
+    #[test]
+    fn load_csv_handles_file_with_only_headers() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("headers_only.csv");
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "name,age,salary").unwrap();
+
+        let (headers, records) = load_csv(&file_path).unwrap();
+
+        assert_eq!(headers, vec!["name", "age", "salary"]);
+        assert!(records.is_empty()); // No data rows
+    }
 
     #[test]
     fn detect_delimiter_identifies_comma() {
