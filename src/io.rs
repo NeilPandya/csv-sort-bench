@@ -1,26 +1,34 @@
 /// Copyright (c) 2026 Neil Pandya
-use crate::models::Record;
-use std::error::Error;
+use crate::models::{CsvError, Record};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-pub fn load_csv(
-    path: &std::path::Path,
-) -> Result<(Vec<String>, Vec<Record>), Box<dyn std::error::Error>> {
+pub fn load_csv(path: &std::path::Path) -> Result<(Vec<String>, Vec<Record>), CsvError> {
+    // Check file existence first
+    if !path.exists() {
+        return Err(CsvError::FileNotFound(path.display().to_string()));
+    }
     let delimiter = detect_delimiter(path);
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(delimiter)
-        .from_path(path)?;
+        .from_path(path)
+        .map_err(|e| CsvError::ParseError(e.to_string()))?;
 
     // Extract headers
-    let headers = rdr.headers()?.iter().map(|s| s.to_string()).collect();
+    let headers = rdr
+        .headers()
+        .map_err(|e| CsvError::ParseError(e.to_string()))?
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
     // Extract records
     let records = rdr
         .records()
         .map(|result| result.map(|record| record.iter().map(|s| s.to_string()).collect()))
-        .collect::<Result<Vec<Record>, _>>()?;
+        .collect::<Result<Vec<Record>, _>>()
+        .map_err(|e| CsvError::ParseError(e.to_string()))?;
 
     Ok((headers, records))
 }
@@ -45,18 +53,21 @@ pub fn detect_delimiter(path: &Path) -> u8 {
     best_delimiter
 }
 
-pub fn save_csv(path: &Path, headers: &[String], records: &[Record]) -> Result<(), Box<dyn Error>> {
-    let mut wtr = csv::Writer::from_path(path)?;
+pub fn save_csv(path: &Path, headers: &[String], records: &[Record]) -> Result<(), CsvError> {
+    let mut wtr = csv::Writer::from_path(path).map_err(|e| CsvError::IoError(e.to_string()))?;
 
     // Write headers
-    wtr.write_record(headers)?;
+    wtr.write_record(headers)
+        .map_err(|e| CsvError::IoError(e.to_string()))?;
 
     // Write data rows
     for record in records {
-        wtr.write_record(record)?;
+        wtr.write_record(record)
+            .map_err(|e| CsvError::IoError(e.to_string()))?;
     }
 
-    wtr.flush()?;
+    wtr.flush().map_err(|e| CsvError::IoError(e.to_string()))?;
+
     Ok(())
 }
 
@@ -67,6 +78,55 @@ mod tests {
     use std::fs;
     use std::io::Write;
     use tempfile::TempDir;
+
+    #[test]
+    fn load_csv_returns_error_for_nonexistent_file() {
+        let nonexistent = std::path::PathBuf::from("/this/file/does/not/exist.csv");
+        let result = load_csv(&nonexistent);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            match e {
+                CsvError::FileNotFound(path) => {
+                    // The path should contain the invalid file path
+                    assert!(path.contains("/this/file/does/not/exist.csv"));
+                }
+                _ => panic!("Expected FileNotFound error, got {:?}", e),
+            }
+        }
+    }
+
+    #[test]
+    fn load_csv_handles_corrupt_csv() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("corrupt.csv");
+        let mut file = fs::File::create(&file_path).unwrap();
+        writeln!(file, "name,age,salary").unwrap();
+        writeln!(file, "Alice,30").unwrap(); // Missing field - should cause parse error
+        writeln!(file, "Bob,25,45000").unwrap();
+
+        let result = load_csv(&file_path);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            match e {
+                CsvError::ParseError(_) => {} // Expected
+                _ => panic!("Expected ParseError"),
+            }
+        }
+    }
+
+    #[test]
+    fn save_csv_returns_io_error_for_invalid_path() {
+        // This should fail due to invalid permissions or non-writable path
+        let invalid_path = std::path::PathBuf::from("/nonexistent/directory/file.csv");
+        let result = save_csv(&invalid_path, &vec!["col1".into()], &vec![]);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            match e {
+                CsvError::IoError(_) => {} // Expected
+                _ => panic!("Expected IoError"),
+            }
+        }
+    }
 
     #[test]
     fn load_csv_reads_basic_comma_delimited() {
