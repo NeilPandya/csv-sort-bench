@@ -2,10 +2,12 @@
 
 use crate::algorithms;
 use crate::io;
-use crate::models::{BenchResult, Record};
+use crate::models::{BenchResult, CsvError, Record};
 use eframe::egui;
 use egui_plot::{Bar, BarChart, Plot};
 use std::path::PathBuf;
+
+const BUBBLE_SORT_ROW_LIMIT: usize = 1000; // Bubble/insertion sort gets slow beyond this
 
 pub struct SortBenchApp {
     records: Vec<Record>,
@@ -13,6 +15,7 @@ pub struct SortBenchApp {
     results: Vec<BenchResult>,
     selected_column_index: usize,
     loaded_file_path: Option<PathBuf>,
+    error: Option<CsvError>,
 }
 
 impl Default for SortBenchApp {
@@ -23,6 +26,7 @@ impl Default for SortBenchApp {
             results: Vec::new(),
             selected_column_index: 0,
             loaded_file_path: None,
+            error: None,
         }
     }
 }
@@ -46,6 +50,16 @@ impl eframe::App for SortBenchApp {
                     self.export_csv();
                 }
             });
+
+            if !self.records.is_empty() && self.records.len() > BUBBLE_SORT_ROW_LIMIT {
+                ui.colored_label(
+                    egui::Color32::YELLOW,
+                    format!(
+                        "⚠️ {} rows - Bubble/Insertion Sort will be slow",
+                        self.records.len()
+                    ),
+                );
+            }
 
             if !self.headers.is_empty() {
                 ui.horizontal(|ui| {
@@ -100,17 +114,17 @@ impl SortBenchApp {
                 self.results.clear();
                 self.selected_column_index = 0;
                 self.loaded_file_path = Some(path);
+                self.error = None;
             }
             Err(e) => {
                 eprintln!("Failed to load CSV: {}", e);
-                // Optionally, you could set an error state to display in the UI
+                self.error = Some(CsvError::ParseError(e.to_string()));
             }
         }
     }
 
     fn export_csv(&mut self) {
         if let Some(ref original_path) = self.loaded_file_path {
-            // 1. Ensure the data is actually sorted according to current selection
             algorithms::standardsort::sort(&mut self.records, self.selected_column_index);
 
             let file_stem = original_path
@@ -122,11 +136,12 @@ impl SortBenchApp {
 
             if let Some(save_path) = rfd::FileDialog::new()
                 .set_file_name(&suggested_name)
-                .add_filter("CSV", &["csv", "tsv", "txt"]) // Expanded filter for ISO standards
+                .add_filter("CSV", &["csv", "tsv", "txt"])
                 .save_file()
             {
-                if let Err(e) = io::save_csv(&save_path, &self.headers, &self.records) {
-                    eprintln!("Failed to save CSV: {}", e);
+                match io::save_csv(&save_path, &self.headers, &self.records) {
+                    Ok(_) => { /* Success - could add a status message */ }
+                    Err(e) => self.error = Some(e),
                 }
             }
         }
@@ -134,16 +149,39 @@ impl SortBenchApp {
 
     fn run_benchmarks(&mut self) {
         self.results.clear();
-        let algorithms = [
+
+        let row_count = self.records.len();
+        let skip_slow = row_count > BUBBLE_SORT_ROW_LIMIT;
+
+        let mut algorithms: Vec<(&str, fn(&mut [Record], usize) -> f64)> = vec![
             (
                 "Std Sort",
                 algorithms::standardsort::sort as fn(&mut [Record], usize) -> f64,
             ),
             ("Merge Sort", algorithms::mergesort::sort),
             ("Quick Sort", algorithms::quicksort::sort),
-            ("Bubble Sort", algorithms::bubblesort::sort),
-            ("Insertion Sort", algorithms::insertionsort::sort),
         ];
+
+        if !skip_slow {
+            algorithms.extend_from_slice(&[
+                ("Bubble Sort", algorithms::bubblesort::sort),
+                ("Insertion Sort", algorithms::insertionsort::sort),
+            ]);
+        } else {
+            // Add a note explaining why some algorithms were skipped
+            self.results.push(BenchResult {
+                name: "Bubble Sort".to_string(),
+                duration_ms: 0.0,
+            });
+            self.results.push(BenchResult {
+                name: "Insertion Sort".to_string(),
+                duration_ms: 0.0,
+            });
+            self.results.push(BenchResult {
+                name: "(skipped: >1000 rows)".to_string(),
+                duration_ms: 0.0,
+            });
+        }
 
         for (name, sort_fn) in algorithms {
             let mut data = self.records.clone();
